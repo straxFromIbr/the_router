@@ -1,20 +1,8 @@
 import json
 import time
-from datetime import datetime
 from pathlib import Path
 
 import rclpy
-from builtin_interfaces.msg import Time
-from geometry_msgs.msg import (
-    Point,
-    Pose,
-    PoseWithCovariance,
-    Quaternion,
-    Twist,
-    TwistWithCovariance,
-    Vector3,
-)
-from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from std_msgs.msg import String
 
@@ -22,13 +10,6 @@ from std_msgs.msg import String
 class MainController(Node):
     def __init__(self):
         super().__init__("main_controller")
-        self.motor_subscription = self.create_subscription(
-            msg_type=Odometry,
-            topic="odom",
-            callback=self.motor_listener_callback,
-            qos_profile=10,
-        )
-        self.motor_subscription  # prevent unused variable warning
 
         self.keyboard_subscription = self.create_subscription(
             msg_type=String,
@@ -37,9 +18,7 @@ class MainController(Node):
             qos_profile=10,
         )
 
-        timer_period = 0.5
         self.publisher = self.create_publisher(String, "control_topic", 10)
-        # self.timer = self.create_timer(timer_period, self.auto_ctrl_timer_callback)
 
         self.auto_mode = False
         self.manual_mode = True
@@ -77,10 +56,10 @@ class MainController(Node):
         last_time = log_data[-1][0]
 
         log_data.reverse()
-        log_data.append((None, "stop", log_data[-1][2]))
+        log_data.append((0, "stop", log_data[-1][2]))
         new_list = []
         for index in range(len(log_data) - 1):
-            t = last_time - log_data[index][0]
+            t = last_time - log_data[index][0] - start_time
             c = self.rev_control(log_data[index + 1][1])
             s = log_data[index + 1][2]
             new_list.append((t, c, s))
@@ -100,30 +79,7 @@ class MainController(Node):
 
         return control
 
-    """
-    def auto_ctrl_timer_callback(self):
-        if self.manual_mode:
-            # do nothing
-            return
-
-        if self.auto_mode:
-            if self.log_data is None:
-                return
-
-            # Read CSV File to generate control parmas
-            generted_direction = "forward"
-
-            data = {
-                "direction": generted_direction,
-                "speed": self.default_speed,
-            }
-
-            self.publisher.publish(data)
-    """
-
     def auto_control(self):
-        print("auto")
-        print(self.log_data)
         if len(self.log_data) == 0:
             return
 
@@ -142,7 +98,6 @@ class MainController(Node):
                     "direction": direction,
                     "speed": speed,
                 }
-                print(">>> GENERATED!! ", data)
 
                 msg = String()
                 msg.data = json.dumps(data)
@@ -154,9 +109,8 @@ class MainController(Node):
                     break
         data = {
             "direction": "stop",
-            "speed": speed,
+            "speed": 1,
         }
-        print(">>> GENERATED!! ", data)
 
         msg = String()
         msg.data = json.dumps(data)
@@ -165,16 +119,13 @@ class MainController(Node):
     def mode_toggle_callback(self, kbd_msg):
         # kbd_msg is JSON expression
         data = json.loads(kbd_msg.data)
-        print(data)
         # Toggle mode Auto or Manual
         if data["auto_mode"] == True:
             reverse = not data["forward_auto"] and data["backward_auto"]
-            # koko de zenkai no flag wo sanshou
             # Load LOG CSV File once
             if self.manual_mode:
-                # self.clear_log()
                 self.load_csv(reverse)
-            # flag wo set simasu
+            # Set flags
             self.auto_mode = True
             self.manual_mode = False
             self.auto_control()
@@ -192,15 +143,6 @@ class MainController(Node):
             self.publisher.publish(kbd_msg)
             return
 
-    def motor_listener_callback(self, odom_msg):
-        if self.manual_mode:
-            pass
-            # self.log(odom_msg)
-
-        if self.auto_mode:
-
-            return
-
     def log(self, kbd_msg: String) -> None:
         # Write on CSV File
         # Ex. Timestamp, Direction, Speed
@@ -211,7 +153,6 @@ class MainController(Node):
         direction = data["direction"]
         speed = data["speed"]
         log_message = f"{time_stamp_str},{direction},{speed}\n"
-        print(log_message)
         self.write_to_file(log_message)
 
     def write_to_file(self, str_msg):

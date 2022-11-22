@@ -1,24 +1,6 @@
-# Copyright 2016 Open Source Robotics Foundation, Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-
 import json
 import math
-import sys
-import termios
 import time
-import tty
 
 import rclpy
 from geometry_msgs.msg import Twist
@@ -58,14 +40,17 @@ class TrapeController(Node):
     def _set_speed(self, target_speed):
         target_speed = float(target_speed)
 
-        direction = 1 if (target_speed - self.current_speed) > 0 else -1
+        delta_speed = (
+            self._delta_speed
+            if (target_speed - self.current_speed) > 0
+            else -1 * self._delta_speed
+        )
 
-        print(self.current_speed, target_speed)
         cmdvel = Twist()
         while abs(target_speed - self.current_speed) > self._delta_speed * 1.5:
-            self.current_speed += direction * self._delta_speed
+            self.current_speed += delta_speed
             if abs(target_speed) < self._minimum_abs_speed:
-                self.current_speed += direction * self._delta_speed
+                self.current_speed += delta_speed
             cmdvel.linear.x = self.current_speed
             self.pub_cmdvel.publish(cmdvel)
 
@@ -76,7 +61,6 @@ class TrapeController(Node):
         self.pub_cmdvel.publish(cmdvel)
 
     def _turn(self, direction):
-        print("turn")
         cmdvel = Twist()
         cmdvel.linear.x = float(0)
         if direction == "right":
@@ -97,8 +81,9 @@ class TrapeController(Node):
         direction = data["direction"]
         if direction == "immd_stop":
             self.immd_stop()
+            return
 
-        speed = self._speed * float(data["speed"]) / self.nb_gear
+        target_speed = self._speed * float(data["speed"]) / self.nb_gear
         if direction == "stop":
             self._set_speed(0.0)
             return
@@ -114,7 +99,7 @@ class TrapeController(Node):
         else:
             return
 
-        self._set_speed(direction * speed)
+        self._set_speed(direction * target_speed)
 
     def _motor_request(self, request_data=False):
         request = SetBool.Request()
