@@ -69,6 +69,7 @@ backward_autoがTrueのときは逆走する
 ROS2組み込みのString型のデータとして発行している。
 たとえば、以下のようなメッセージである。なお、見やすさのために改行やインデントを含んでいるが実際には1行で表現されている。
 
+```json
 { 
   "direction": "forward",
   "speed": 1,
@@ -77,6 +78,7 @@ ROS2組み込みのString型のデータとして発行している。
   "forward_auto": false,
   "backward_auto": true
 }
+```
 
 各値の型は、上述したインスタンス内部の状態変数の型に対応するJSONオブジェクトの型である。
 
